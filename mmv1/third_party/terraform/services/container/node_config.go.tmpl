@@ -1059,6 +1059,39 @@ func schemaNodeConfig() *schema.Schema {
 									},
 								},
 							},
+{{- if ne $.TargetVersionName "ga" }}
+							"reserved_resources_config": {
+								Type:        schema.TypeList,
+								Optional:    true,
+								Computed:    true,
+								MaxItems:    1,
+								Description: `Controls the reserved resources on the node.`,
+								Elem: &schema.Resource{
+									Schema: map[string]*schema.Schema{
+										"cpu_reserved_millicore": {
+											Type:        schema.TypeInt,
+											Optional:    true,
+											Description: `The amount of CPU to reserve for system daemons. This is a user-specified value. If unspecified, GKE decides the default based on node version using different formula.`,
+										},
+										"effective_cpu_reserved_millicore": {
+											Type:        schema.TypeInt,
+											Computed:    true,
+											Description: `The effective amount of CPU reserved for system daemons. If cpu_reserved_millicore is specified, user-specified value is used. Otherwise the GKE default is applied.`,
+										},
+										"memory_reserved_mib": {
+											Type:        schema.TypeInt,
+											Optional:    true,
+											Description: `The amount of memory to reserve for system daemons (in MiB). This is a user-specified value. If unspecified, GKE decides the default based on node version using different formula.`,
+										},
+										"effective_memory_reserved_mib": {
+											Type:        schema.TypeInt,
+											Computed:    true,
+											Description: `The effective amount of memory reserved for system daemons. If memory_reserved_mib is specified, the user-specified value is used. Otherwise the GKE default is applied.`,
+										},
+									},
+								},
+							},
+{{- end }}
 						},
 					},
 				},
@@ -2265,8 +2298,42 @@ func expandKubeletConfig(v interface{}) *container.NodeKubeletConfig {
 		}
 		kConfig.CrashLoopBackOff = crashLoopBackOff
 	}
+{{- if ne $.TargetVersionName "ga" }}
+	if v, ok := cfg["reserved_resources_config"]; ok {
+		kConfig.ReservedResourcesConfig = expandReservedResourcesConfig(v)
+	}
+{{- end }}
 	return kConfig
 }
+
+{{- if ne $.TargetVersionName "ga" }}
+func expandReservedResourcesConfig(v interface{}) *container.ReservedResourcesConfig {
+	if v == nil {
+		return nil
+	}
+	ls := v.([]interface{})
+	if len(ls) == 0 || ls[0] == nil {
+		return nil
+	}
+	cfg := ls[0].(map[string]interface{})
+	rrc := &container.ReservedResourcesConfig{}
+	hasField := false
+	if cpuReservedMillicore, ok := cfg["cpu_reserved_millicore"]; ok && cpuReservedMillicore.(int) != 0 {
+		rrc.CpuReservedMillicore = int64(cpuReservedMillicore.(int))
+		hasField = true
+	}
+	if memoryReservedMib, ok := cfg["memory_reserved_mib"]; ok && memoryReservedMib.(int) != 0 {
+		rrc.MemoryReservedMib = int64(memoryReservedMib.(int))
+		hasField = true
+	}
+	if !hasField {
+		return nil
+	}
+	return rrc
+}
+{{- end }}
+
+
 
 func expandTopologyManager(v interface{}) *container.TopologyManager {
 	if v == nil {
@@ -3508,10 +3575,34 @@ func flattenKubeletConfig(c *container.NodeKubeletConfig) []map[string]interface
 			"eviction_soft_grace_period":             flattenEvictionGracePeriod(c.EvictionSoftGracePeriod),
 			"eviction_minimum_reclaim":               flattenEvictionMinimumReclaim(c.EvictionMinimumReclaim),
 			"crash_loop_back_off":                    flattenCrashLoopBackOffConfig(c.CrashLoopBackOff),
+{{- if ne $.TargetVersionName "ga" }}
+			"reserved_resources_config":              flattenReservedResourcesConfig(c.ReservedResourcesConfig),
+{{- end }}
 		})
 	}
 	return result
 }
+
+{{- if ne $.TargetVersionName "ga" }}
+func flattenReservedResourcesConfig(c *container.ReservedResourcesConfig) []map[string]interface{} {
+	result := []map[string]interface{}{}
+	if c != nil {
+		if c.CpuReservedMillicore == 0 && c.EffectiveCpuReservedMillicore == 0 &&
+			c.MemoryReservedMib == 0 && c.EffectiveMemoryReservedMib == 0 {
+			return result
+		}
+		result = append(result, map[string]interface{}{
+			"cpu_reserved_millicore":           c.CpuReservedMillicore,
+			"effective_cpu_reserved_millicore": c.EffectiveCpuReservedMillicore,
+			"memory_reserved_mib":              c.MemoryReservedMib,
+			"effective_memory_reserved_mib":    c.EffectiveMemoryReservedMib,
+		})
+	}
+	return result
+}
+{{- end }}
+
+
 
 func flattenTopologyManager(c *container.TopologyManager) []map[string]interface{} {
 	result := []map[string]interface{}{}

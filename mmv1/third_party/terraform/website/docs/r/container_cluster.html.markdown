@@ -1265,6 +1265,10 @@ kubelet_config {
   cpu_cfs_quota        = true
   cpu_cfs_quota_period = "100us"
   pod_pids_limit       = 1024
+  reserved_resources_config {
+    cpu_reserved_millicore = 1000
+    memory_reserved_mib    = 3000
+  }
 }
 ```
 
@@ -1790,6 +1794,8 @@ those in the Guaranteed QoS class, by influencing NUMA affinity. Structure is [d
 
 * `shutdown_grace_period_critical_pods_seconds` - (Optional) The grace period (in seconds) to use during a graceful node shutdown for critical pods. This value must be less than or equal to `shutdown_grace_period_seconds`. This field can only be configured if the node pool uses Spot VMs or Preemptible VMs.
 
+* `reserved_resources_config` - (Optional, [Beta](../guides/provider_versions.html.markdown)) Controls the amount of CPU and memory that is reserved for the system. Node pool must run GKE 1.37 or above. Structure is [documented below](#nested_reserved_resources_config).
+
 <a name="nested_eviction_soft"></a>The `eviction_soft` block supports:
 
 * `memory_available` - (Optional) Defines quantity of soft eviction threshold for memory.available. The value must be a quantity, such as `"100Mi"`. The value must be greater than or equal to the GKE default hard eviction threshold of `"100Mi"` and less than 50% of machine memory.
@@ -1833,6 +1839,20 @@ those in the Guaranteed QoS class, by influencing NUMA affinity. Structure is [d
 <a name="nested_crash_loop_back_off"></a>The `crash_loop_back_off` block supports:
 
 * `max_container_restart_period` - (Optional) The maximum duration the backoff delay can accrue to for container restarts. If not set, defaults to the internal crashloopbackoff maximum. The value must be a positive duration string no more than `"5m"` and no less than `"1s"`, such as `"30s"`, `"1m30s"`, `"2.5m"`. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h". See [Configurable container restart delay](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#configurable-container-restart-delay) for more details.
+
+<a name="nested_reserved_resources_config"></a>The `reserved_resources_config` block supports:
+
+* `cpu_reserved_millicore` - (Optional) The amount of CPU to reserve for system daemons in millicores (e.g. `100` for 0.1 CPU). This is a user-specified value. If unspecified, GKE decides the default based on node version using different formula.
+* `effective_cpu_reserved_millicore` - (Computed) The effective amount of CPU reserved for system daemons in millicores. If `cpu_reserved_millicore` is specified, the user-specified value is used. Otherwise the GKE default is applied.
+* `memory_reserved_mib` - (Optional) The amount of memory to reserve for system daemons (in MiB). This is a user-specified value. If unspecified, GKE decides the default based on node version using different formula.
+* `effective_memory_reserved_mib` - (Computed) The effective amount of memory reserved for system daemons (in MiB). If `memory_reserved_mib` is specified, the user-specified value is used. Otherwise the GKE default is applied.
+
+```hcl
+reserved_resources_config {
+  cpu_reserved_millicore = 1000
+  memory_reserved_mib    = 3000
+}
+```
 
 <a name="nested_linux_node_config"></a>The `linux_node_config` block supports:
 
@@ -2124,6 +2144,10 @@ exported:
 * `cluster_autoscaling.0.auto_provisioning_defaults.0.management.0.upgrade_options` - Specifies the [Auto Upgrade knobs](https://cloud.google.com/kubernetes-engine/docs/reference/rest/v1beta1/NodeManagement#AutoUpgradeOptions) for the node pool.
 
 * `node_config.0.effective_taints` - List of kubernetes taints applied to each node. Structure is [documented above](#nested_taint).
+
+* `node_config.0.kubelet_config.0.reserved_resources_config.0.effective_cpu_reserved_millicore` - The effective amount of CPU reserved for system daemons in millicores.
+
+* `node_config.0.kubelet_config.0.reserved_resources_config.0.effective_memory_reserved_mib` - The effective amount of memory reserved for system daemons in MiB.
 
 * `fleet.0.membership` - The resource name of the fleet Membership resource associated to this cluster with format `//gkehub.googleapis.com/projects/{{project}}/locations/{{location}}/memberships/{{name}}`. See the official doc for [fleet management](https://cloud.google.com/kubernetes-engine/docs/fleets-overview).
 

@@ -375,6 +375,10 @@ In addition to the arguments listed above, the following computed attributes are
 
 * `managed_instance_group_urls` - List of instance group URLs which have been assigned to this node pool.
 
+* `node_config.0.kubelet_config.0.reserved_resources_config.0.effective_cpu_reserved_millicore` - The effective amount of CPU reserved for system daemons in millicores.
+
+* `node_config.0.kubelet_config.0.reserved_resources_config.0.effective_memory_reserved_mib` - The effective amount of memory reserved for system daemons in MiB.
+
 <a id="timeouts"></a>
 ## Timeouts
 
@@ -390,6 +394,23 @@ In addition to the arguments listed above, the following computed attributes are
 * `shutdown_grace_period_seconds` - (Optional) The grace period (in seconds) to use during a graceful node shutdown. This is the time allocated for all pods (critical and non-critical) to terminate. The value must be between 10 and 10000. This field can only be configured if the node pool uses Spot VMs or Preemptible VMs.
 
 * `shutdown_grace_period_critical_pods_seconds` - (Optional) The grace period (in seconds) to use during a graceful node shutdown for critical pods. This value must be less than or equal to `shutdown_grace_period_seconds`. This field can only be configured if the node pool uses Spot VMs or Preemptible VMs.
+
+* `reserved_resources_config` - (Optional, [Beta](../guides/provider_versions.html.markdown)) Controls the amount of CPU and memory that is reserved for the system. Node pool must run GKE 1.37 or above. Structure is [documented below](#nested_reserved_resources_config).
+
+<a name="nested_reserved_resources_config"></a>The `reserved_resources_config` block supports:
+
+* `cpu_reserved_millicore` - (Optional) The amount of CPU to reserve for system daemons in millicores (e.g. `100` for 0.1 CPU). This is a user-specified value. If unspecified, GKE decides the default based on node version using different formula.
+* `effective_cpu_reserved_millicore` - (Computed) The effective amount of CPU reserved for system daemons in millicores. If `cpu_reserved_millicore` is specified, the user-specified value is used. Otherwise the GKE default is applied.
+* `memory_reserved_mib` - (Optional) The amount of memory to reserve for system daemons (in MiB). This is a user-specified value. If unspecified, GKE decides the default based on node version using different formula.
+* `effective_memory_reserved_mib` - (Computed) The effective amount of memory reserved for system daemons (in MiB). If `memory_reserved_mib` is specified, the user-specified value is used. Otherwise the GKE default is applied.
+
+```hcl
+reserved_resources_config {
+  cpu_reserved_millicore = 1000
+  memory_reserved_mib    = 3000
+}
+```
+
 
 ## Import
 

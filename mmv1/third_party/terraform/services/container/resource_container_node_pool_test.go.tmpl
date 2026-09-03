@@ -1058,6 +1058,45 @@ func TestAccContainerNodePool_withKubeletConfigShutdownGracePeriod(t *testing.T)
 	})
 }
 
+{{- if ne $.TargetVersionName "ga" }}
+func TestAccContainerNodePool_withKubeletConfigReservedResourcesConfig(t *testing.T) {
+	t.Parallel()
+
+	cluster := fmt.Sprintf("tf-test-cluster-%s", acctest.RandString(t, 10))
+	np := fmt.Sprintf("tf-test-np-%s", acctest.RandString(t, 10))
+	networkName := tpgcompute.BootstrapSharedTestNetwork(t, "gke-cluster")
+	subnetworkName := tpgcompute.BootstrapSubnet(t, "gke-cluster", networkName)
+
+	acctest.VcrTest(t, resource.TestCase{
+		PreCheck:                 func() { acctest.AccTestPreCheck(t) },
+		ProtoV5ProviderFactories: acctest.ProtoV5ProviderFactories(t),
+		CheckDestroy:             testAccCheckContainerClusterDestroyProducer(t),
+		Steps: []resource.TestStep{
+			{
+				Config: testAccContainerNodePool_withKubeletConfigReservedResourcesConfig(cluster, np, networkName, subnetworkName, 1000, 3000),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("google_container_node_pool.with_kubelet_config_reserved_resources",
+						"node_config.0.kubelet_config.0.reserved_resources_config.0.cpu_reserved_millicore", "1000"),
+					resource.TestCheckResourceAttr("google_container_node_pool.with_kubelet_config_reserved_resources",
+						"node_config.0.kubelet_config.0.reserved_resources_config.0.memory_reserved_mib", "3000"),
+					resource.TestCheckResourceAttrSet("google_container_node_pool.with_kubelet_config_reserved_resources",
+						"node_config.0.kubelet_config.0.reserved_resources_config.0.effective_cpu_reserved_millicore"),
+					resource.TestCheckResourceAttrSet("google_container_node_pool.with_kubelet_config_reserved_resources",
+						"node_config.0.kubelet_config.0.reserved_resources_config.0.effective_memory_reserved_mib"),
+				),
+			},
+			{
+				ResourceName:            "google_container_node_pool.with_kubelet_config_reserved_resources",
+				ImportState:             true,
+				ImportStateVerify:       true,
+				ImportStateVerifyIgnore: []string{"node_config.0.version"},
+			},
+		},
+	})
+}
+{{- end }}
+
+
 func TestAccContainerNodePool_withInvalidKubeletCpuManagerPolicy(t *testing.T) {
 	t.Parallel()
 	// Unit test, no interactions
@@ -4405,6 +4444,44 @@ resource "google_container_node_pool" "with_kubelet_config_shutdown" {
 }
 `, cluster, networkName, subnetworkName, np, shutdownGracePeriodSeconds, shutdownGracePeriodCriticalPodsSeconds)
 }
+
+{{- if ne $.TargetVersionName "ga" }}
+func testAccContainerNodePool_withKubeletConfigReservedResourcesConfig(cluster, np, networkName, subnetworkName string, cpuReservedMillicore, memoryReservedMib int) string {
+	return fmt.Sprintf(`
+resource "google_container_cluster" "cluster" {
+  name                = "%s"
+  location            = "us-central1-a"
+  initial_node_count  = 1
+  min_master_version  = "1.37.0-gke.2100000+preview"
+  deletion_protection = false
+  network             = "%s"
+  subnetwork          = "%s"
+  release_channel {
+    channel = "RAPID"
+  }
+}
+
+resource "google_container_node_pool" "with_kubelet_config_reserved_resources" {
+  name               = "%s"
+  location           = "us-central1-a"
+  cluster            = google_container_cluster.cluster.name
+  initial_node_count = 1
+  version            = "1.37.0-gke.2100000+preview"
+  node_config {
+    machine_type = "e2-standard-4"
+    image_type   = "COS_CONTAINERD"
+    kubelet_config {
+      reserved_resources_config {
+        cpu_reserved_millicore = %d
+        memory_reserved_mib    = %d
+      }
+    }
+  }
+}
+`, cluster, networkName, subnetworkName, np, cpuReservedMillicore, memoryReservedMib)
+}
+{{- end }}
+
 
 func testAccContainerNodePool_withLinuxNodeConfig(cluster, np, tcpMem, networkName, subnetworkName string) string {
 	linuxNodeConfig := `
